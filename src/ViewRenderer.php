@@ -12,6 +12,7 @@ use Twig\Lexer;
 use Twig\Loader\FilesystemLoader;
 use Yii;
 use yii\base\View;
+use yii\base\ViewContextInterface;
 use yii\base\ViewRenderer as BaseViewRenderer;
 
 /**
@@ -112,7 +113,11 @@ class ViewRenderer extends BaseViewRenderer
      * @since 2.0.5
      */
     public $twigFallbackPaths = [];
-
+    /**
+     * @var FilesystemLoader[]
+     * @since 2.4.2
+     */
+    protected $loaders=[];
 
     public function init()
     {
@@ -163,13 +168,20 @@ class ViewRenderer extends BaseViewRenderer
     public function render($view, $file, $params)
     {
         $this->twig->addGlobal('this', $view);
-        $loader = new FilesystemLoader(dirname($file));
-        if ($view instanceof View) {
-            $this->addFallbackPaths($loader, $view->theme);
+        $key="";
+        if($view->context instanceof ViewContextInterface){
+            $key = $view->context->getViewPath();
         }
+        if(!isset($this->loaders[$key])) {
+            // the first time only
+            $this->loaders[$key]  = new FilesystemLoader(dirname($file));
+            if ($view instanceof View) {
+                $this->addFallbackPaths($this->loaders[$key], $view->theme);
+            }
 
-        $this->addAliases($loader, Yii::$aliases);
-        $this->twig->setLoader($loader);
+            $this->addAliases($this->loaders[$key], Yii::$aliases);
+        }
+        $this->twig->setLoader($this->loaders[$key]);
 
         // Change lexer syntax (must be set after other settings)
         if (!empty($this->lexerOptions)) {
